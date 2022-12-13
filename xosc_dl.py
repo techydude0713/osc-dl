@@ -954,33 +954,34 @@ class MainWindow(gui.ui_united.Ui_MainWindow, QMainWindow):
         original_host = self.current_repo['host']
         icons_zip = content = None
         logging.debug("Started download of app icons")
-        if gui_helpers.settings.value("cachemgr/lastIconDL") is None or not os.path.isfile(resource_path("cache/temp_files.zip")):
-            gui_helpers.settings.setValue("cachemgr/lastIconDL","Fri, 21 April 2006 05:10:59 GMT")
+        lock.acquire()
+        if not os.path.isdir(resource_path("cache")):
+            os.mkdir(resource_path("cache"))
+
+        if gui_helpers.settings.value(f"cachemgr/lastIconDL_{self.current_repo['id']}") is None or not os.path.isfile(resource_path(f"cache/temp_files_{self.current_repo['id']}.zip")):
+            gui_helpers.settings.setValue(f"cachemgr/lastIconDL_{self.current_repo['id']}","Fri, 21 April 2006 05:10:59 GMT")
             gui_helpers.settings.sync()
-            if not os.path.isdir(resource_path("cache")):
-                os.mkdir(resource_path("cache"))
-            
+
         start_time = time.time()
         try:
             icons_zip = requests.get(f"https://{self.current_repo['host']}/hbb/homebrew_browser/temp_files.zip", 
-                timeout=10,headers={"If-Modified-Since":gui_helpers.settings.value("cachemgr/lastIconDL")})
+                timeout=10,headers={"If-Modified-Since":gui_helpers.settings.value(f"cachemgr/lastIconDL_{self.current_repo['id']}")})
         except requests.exceptions.ConnectionError:
-            if os.path.isfile(resource_path("cache/temp_files.zip")):
-                with open(resource_path("cache/temp_files.zip"),"rb") as f:
+            if os.path.isfile(resource_path(f"cache/temp_files_{self.current_repo['id']}.zip")):
+                with open(resource_path(f"cache/temp_files_{self.current_repo['id']}.zip"),"rb") as f:
                     content = f.read()
             pass
 
         if icons_zip != None:
             content = icons_zip.content
-            gui_helpers.settings.setValue("cachemgr/lastIconDL", icons_zip.headers["date"])
+            gui_helpers.settings.setValue(f"cachemgr/lastIconDL_{self.current_repo['id']}", icons_zip.headers["date"])
             gui_helpers.settings.sync()
 
-            lock.acquire()
             if icons_zip.status_code != 304 and icons_zip.ok:
-                with open(resource_path("cache/temp_files.zip"),"wb") as f:
+                with open(resource_path(f"cache/temp_files_{self.current_repo['id']}.zip"),"wb") as f:
                     f.write(icons_zip.content)
             else:
-                with open(resource_path("cache/temp_files.zip"),"rb") as f:
+                with open(resource_path(f"cache/temp_files_{self.current_repo['id']}.zip"),"rb") as f:
                     content = f.read()
 
             lock.release()
