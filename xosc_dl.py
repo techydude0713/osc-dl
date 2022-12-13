@@ -898,7 +898,7 @@ class MainWindow(gui.ui_united.Ui_MainWindow, QMainWindow):
 
         # Set website URL
         self.ui.ViewDevWebsite.setText(f'<a href="https://oscwii.org/library?coder={self.current_developer}">'
-                                       f'<span style=" text-decoration: underline; color:#0000ff;">Profile on '
+                                       f'<span style=" text-decoration: underline; color:#2b75ee;">Profile on '
                                        f'Website</span></a>')
 
         # hide anything from a different coder
