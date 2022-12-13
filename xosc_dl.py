@@ -18,6 +18,7 @@ from functools import partial
 
 import func_timeout
 import requests
+import darkdetect
 from PIL import Image
 from PySide6 import QtGui, QtCore
 from PySide6.QtCore import Qt, QObject, QSize
@@ -121,7 +122,7 @@ class MainWindow(gui.ui_united.Ui_MainWindow, QMainWindow):
         self.ui.CategoriesComboBox.setItemIcon(5, QIcon(resource_path("assets/gui/icons/category/demo.png")))
 
         # ACTIONS
-        self.ui.actionDeveloper_Profile.setIcon(QIcon(resource_path("assets/gui/icons/profile.png")))
+        self.ui.actionDeveloper_Profile.setIcon(QIcon(resource_path(f"assets/gui/icons/profile/{darkdetect.theme()}/profile.png")))
         self.ui.developer.addAction(self.ui.actionDeveloper_Profile, QLineEdit.TrailingPosition)
 
         # create spinner movie
@@ -291,49 +292,49 @@ class MainWindow(gui.ui_united.Ui_MainWindow, QMainWindow):
                 item = QListWidgetItem()
                 item.setText(f"{str(peripherals['wii_remotes'])} Wii Remotes")
                 item.setIcon(QIcon(
-                    resource_path(f"assets/gui/icons/controllers/{str(peripherals['wii_remotes'])}WiiRemote.png")))
+                    resource_path(f"assets/gui/icons/controllers/{darkdetect.theme()}/{str(peripherals['wii_remotes'])}WiiRemote.png")))
                 item.setToolTip(f"This app supports up to {str(peripherals['wii_remotes'])} Wii Remotes.")
                 self.ui.SupportedControllersListWidget.addItem(item)
             elif peripherals["wii_remotes"] == 1:
                 item = QListWidgetItem()
                 item.setText(f"1 Wii Remote")
-                item.setIcon(QIcon(resource_path(f"assets/gui/icons/controllers/1WiiRemote.png")))
+                item.setIcon(QIcon(resource_path(f"assets/gui/icons/controllers/{darkdetect.theme()}/1WiiRemote.png")))
                 item.setToolTip("This app supports a single Wii Remote.")
                 self.ui.SupportedControllersListWidget.addItem(item)
             if peripherals["nunchuk"] is True:
                 item = QListWidgetItem()
                 item.setText(f"Nunchuk")
-                item.setIcon(QIcon(resource_path(f"assets/gui/icons/controllers/Nunchuk.png")))
+                item.setIcon(QIcon(resource_path(f"assets/gui/icons/controllers/{darkdetect.theme()}/Nunchuk.png")))
                 item.setToolTip("This app can be used with a Nunchuk.")
                 self.ui.SupportedControllersListWidget.addItem(item)
             if peripherals["classic"] is True:
                 item = QListWidgetItem()
                 item.setText(f"Classic Controller")
-                item.setIcon(QIcon(resource_path(f"assets/gui/icons/controllers/ClassicController.png")))
+                item.setIcon(QIcon(resource_path(f"assets/gui/icons/controllers/{darkdetect.theme()}/ClassicController.png")))
                 item.setToolTip("This app can be used with a Classic Controller.")
                 self.ui.SupportedControllersListWidget.addItem(item)
             if peripherals["gamecube"] is True:
                 item = QListWidgetItem()
                 item.setText(f"GameCube Controller")
-                item.setIcon(QIcon(resource_path(f"assets/gui/icons/controllers/GamecubeController.png")))
+                item.setIcon(QIcon(resource_path(f"assets/gui/icons/controllers/{darkdetect.theme()}/GamecubeController.png")))
                 item.setToolTip("This app can be used with a Gamecube Controller.")
                 self.ui.SupportedControllersListWidget.addItem(item)
             if peripherals["wii_zapper"] is True:
                 item = QListWidgetItem()
                 item.setText(f"Wii Zapper")
-                item.setIcon(QIcon(resource_path(f"assets/gui/icons/controllers/WiiZapper.png")))
+                item.setIcon(QIcon(resource_path(f"assets/gui/icons/controllers/{darkdetect.theme()}/WiiZapper.png")))
                 item.setToolTip("This app can be used with a Wii Zapper.")
                 self.ui.SupportedControllersListWidget.addItem(item)
             if peripherals["keyboard"] is True:
                 item = QListWidgetItem()
                 item.setText(f"USB Keyboard")
-                item.setIcon(QIcon(resource_path(f"assets/gui/icons/controllers/USBKeyboard.png")))
+                item.setIcon(QIcon(resource_path(f"assets/gui/icons/controllers/{darkdetect.theme()}/USBKeyboard.png")))
                 item.setToolTip("This app can be used with a USB Keyboard.")
                 self.ui.SupportedControllersListWidget.addItem(item)
             if peripherals["sdhc"] is True:
                 item = QListWidgetItem()
                 item.setText(f"SDHC Card")
-                item.setIcon(QIcon(resource_path(f"assets/gui/icons/controllers/SDHC.png")))
+                item.setIcon(QIcon(resource_path(f"assets/gui/icons/controllers/{darkdetect.theme()}/SDHC.png")))
                 item.setToolTip("This app is confirmed to support SDHC cards.")
                 self.ui.SupportedControllersListWidget.addItem(item)
 
@@ -1073,6 +1074,15 @@ class MainWindow(gui.ui_united.Ui_MainWindow, QMainWindow):
             closeEvent.ignore()
         else:
             closeEvent.accept()
+    
+    def changeEvent(self,changeEvent):
+        if changeEvent.type() == QtCore.QEvent.Type.ThemeChange:
+            self.ui.actionDeveloper_Profile.setIcon(QIcon(resource_path(f"assets/gui/icons/profile/{darkdetect.theme()}/profile.png")))
+            for x in range(self.ui.SupportedControllersListWidget.count()):
+                self.ui.SupportedControllersListWidget.item(x).setIcon(
+                    QIcon(resource_path(f"assets/gui/icons/controllers/{darkdetect.theme()}/{self.ui.SupportedControllersListWidget.item(x).text().replace(' ','')}.png"))
+                )
+        changeEvent.accept()
 
     def ongoingOperations(self):
         return gui_helpers.CURRENTLY_SENDING or gui_helpers.IN_DOWNLOAD_DIALOG or gui_helpers.CURRENTLY_LOADING_ICONS
