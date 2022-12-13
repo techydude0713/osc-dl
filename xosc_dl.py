@@ -948,20 +948,42 @@ class MainWindow(gui.ui_united.Ui_MainWindow, QMainWindow):
 
     # load all icons from zip
     def download_app_icons(self):
+        lock = threading.Lock()
         gui_helpers.CURRENTLY_LOADING_ICONS = True
         # Debug info
         original_host = self.current_repo['host']
         logging.debug("Started download of app icons")
+        if gui_helpers.settings.value("cachemgr/lastIconDL") is None or not os.path.isfile(resource_path("cache/temp_files.zip")):
+            gui_helpers.settings.setValue("cachemgr/lastIconDL","Fri, 21 April 2006 05:10:59 GMT")
+            gui_helpers.settings.sync()
+            if not os.path.isdir(resource_path("cache")):
+                os.mkdir(resource_path("cache"))
+            
         start_time = time.time()
-        icons_zip = requests.get(f"https://{self.current_repo['host']}/hbb/homebrew_browser/temp_files.zip", timeout=10)
-        end_time = time.time()
-        logging.debug(f"Finished download of app icons in {str(end_time - start_time)}")
+        icons_zip = requests.get(f"https://{self.current_repo['host']}/hbb/homebrew_browser/temp_files.zip", 
+            timeout=10,headers={"If-Modified-Since":gui_helpers.settings.value("cachemgr/lastIconDL")})
 
         if icons_zip.ok and (original_host == self.current_repo['host']):
+            content = icons_zip.content
+            gui_helpers.settings.setValue("cachemgr/lastIconDL", icons_zip.headers["date"])
+            gui_helpers.settings.sync()
+
+            lock.acquire()
+            if icons_zip.status_code != 304:
+                with open(resource_path("cache/temp_files.zip"),"wb") as f:
+                    f.write(icons_zip.content)
+            else:
+                with open(resource_path("cache/temp_files.zip"),"rb") as f:
+                    content = f.read()
+
+            lock.release()
+            end_time = time.time()
+            print(f"Finished download of app icons in {str(end_time - start_time)}")
+
             # prepare app icons dictionary
             self.icons_images = {}
             self.list_icons_images = {}
-            zip_file = zipfile.ZipFile(io.BytesIO(icons_zip.content))
+            zip_file = zipfile.ZipFile(io.BytesIO(content))
 
             # prepare icon files
             demo_icon = Image.open(resource_path("assets/gui/icons/category/demo.png"))

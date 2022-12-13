@@ -230,3 +230,7 @@ pip-selfcheck.json
 
 # macOS
 .DS_Store
+
+# OSC-DL Related Files
+cache/
+apps/
