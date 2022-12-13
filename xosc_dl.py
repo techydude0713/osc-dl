@@ -322,7 +322,7 @@ class MainWindow(gui.ui_united.Ui_MainWindow, QMainWindow):
                 item.setIcon(QIcon(resource_path(f"assets/gui/icons/controllers/GamecubeController.png")))
                 item.setToolTip("This app can be used with a Gamecube Controller.")
                 self.ui.SupportedControllersListWidget.addItem(item)
-            if peripherals["wii_zapper"] is True:
+            if peripherals["zapper"] is True:
                 item = QListWidgetItem()
                 item.setText(f"Wii Zapper")
                 item.setIcon(QIcon(resource_path(f"assets/gui/icons/controllers/WiiZapper.png")))

@@ -31,6 +31,8 @@ def long_description(app_name, repo="hbb1.oscwii.org"):
         xml = requests.get("https://" + repo + "/unzipped_apps/" + app_name + "/apps/" + app_name + "/meta.xml").text
     except requests.exceptions.SSLError:
         xml = requests.get("http://" + repo + "/unzipped_apps/" + app_name + "/apps/" + app_name + "/meta.xml").text
+    except requests.exceptions.ConnectionError:
+        return f'<i><span>Unable to fetch the description!</span></i>'
 
     # Remove unicode declaration
     xml = xml.split("\n", 1)[1]
@@ -44,7 +46,7 @@ def long_description(app_name, repo="hbb1.oscwii.org"):
     except Exception as e:
         logging.error(f"[{app_name}] With the intention to load the long description, "
                       f"OSCDL could not parse the application metadata XML. Information:\n{str(e)}")
-        return "No description provided"
+        return f'<i><span>No description provided...</span></i>'
 
     return root.find('long_description').text
 
@@ -68,23 +70,9 @@ def category_display_name(category):
 # Parse controllers string
 def parse_peripherals(peripherals):
     peripherals_dict = {"wii_remotes": 0, "nunchuk": False, "classic": False, "gamecube": False,
-                        "wii_zapper": False, "keyboard": False, "sdhc": False}
+                        "zapper": False, "keyboard": False, "sdhc": False}
 
-    # One day OSCDL will drop support for <3.10 and this will be a switch statement..
-    for character in peripherals:
-        if character == "w":
-            peripherals_dict["wii_remotes"] += 1
-        elif character == "n":
-            peripherals_dict["nunchuk"] = True
-        elif character == "c":
-            peripherals_dict["classic"] = True
-        elif character == "g":
-            peripherals_dict["gamecube"] = True
-        if character == "z":
-            peripherals_dict["wii_zapper"] = True
-        if character == "k":
-            peripherals_dict["keyboard"] = True
-        if character == "s":
-            peripherals_dict["sdhc"] = True
+    for x,y in enumerate(peripherals_dict):
+        peripherals_dict[y] = (peripherals.count(y[0]) if peripherals.count(y[0]) > 1 else bool(peripherals.count(y[0])))
 
     return peripherals_dict
