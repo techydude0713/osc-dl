@@ -952,6 +952,7 @@ class MainWindow(gui.ui_united.Ui_MainWindow, QMainWindow):
         gui_helpers.CURRENTLY_LOADING_ICONS = True
         # Debug info
         original_host = self.current_repo['host']
+        icons_zip = content = None
         logging.debug("Started download of app icons")
         if gui_helpers.settings.value("cachemgr/lastIconDL") is None or not os.path.isfile(resource_path("cache/temp_files.zip")):
             gui_helpers.settings.setValue("cachemgr/lastIconDL","Fri, 21 April 2006 05:10:59 GMT")
@@ -960,16 +961,22 @@ class MainWindow(gui.ui_united.Ui_MainWindow, QMainWindow):
                 os.mkdir(resource_path("cache"))
             
         start_time = time.time()
-        icons_zip = requests.get(f"https://{self.current_repo['host']}/hbb/homebrew_browser/temp_files.zip", 
-            timeout=10,headers={"If-Modified-Since":gui_helpers.settings.value("cachemgr/lastIconDL")})
+        try:
+            icons_zip = requests.get(f"https://{self.current_repo['host']}/hbb/homebrew_browser/temp_files.zip", 
+                timeout=10,headers={"If-Modified-Since":gui_helpers.settings.value("cachemgr/lastIconDL")})
+        except requests.exceptions.ConnectionError:
+            if os.path.isfile(resource_path("cache/temp_files.zip")):
+                with open(resource_path("cache/temp_files.zip"),"rb") as f:
+                    content = f.read()
+            pass
 
-        if icons_zip.ok and (original_host == self.current_repo['host']):
+        if icons_zip != None:
             content = icons_zip.content
             gui_helpers.settings.setValue("cachemgr/lastIconDL", icons_zip.headers["date"])
             gui_helpers.settings.sync()
 
             lock.acquire()
-            if icons_zip.status_code != 304:
+            if icons_zip.status_code != 304 and icons_zip.ok:
                 with open(resource_path("cache/temp_files.zip"),"wb") as f:
                     f.write(icons_zip.content)
             else:
@@ -978,8 +985,8 @@ class MainWindow(gui.ui_united.Ui_MainWindow, QMainWindow):
 
             lock.release()
             end_time = time.time()
-            print(f"Finished download of app icons in {str(end_time - start_time)}")
-
+            logging.debug(f"Finished download of app icons in {str(end_time - start_time)}")
+        if content and (original_host == self.current_repo['host']):
             # prepare app icons dictionary
             self.icons_images = {}
             self.list_icons_images = {}
