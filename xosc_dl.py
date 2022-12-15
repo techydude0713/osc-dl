@@ -953,12 +953,13 @@ class MainWindow(gui.ui_united.Ui_MainWindow, QMainWindow):
         # Debug info
         original_host = self.current_repo['host']
         icons_zip = content = None
+        isCached = False
         logging.debug("Started download of app icons")
         lock.acquire()
         if not os.path.isdir(resource_path("cache")):
             os.mkdir(resource_path("cache"))
 
-        if gui_helpers.settings.value(f"cachemgr/lastIconDL_{self.current_repo['id']}") is None or not os.path.isfile(resource_path(f"cache/temp_files_{self.current_repo['id']}.zip")):
+        if gui_helpers.settings.value(f"cachemgr/lastIconDL_{self.current_repo['id']}") is None or not os.path.isfile(resource_path(f"cache/temp_files_{self.current_repo['id']}.zip")) or not os.path.isfile(resource_path(f"cache/list_app_widget_icons_{self.current_repo['id']}.zip")):
             gui_helpers.settings.setValue(f"cachemgr/lastIconDL_{self.current_repo['id']}","Fri, 21 April 2006 05:10:59 GMT")
             gui_helpers.settings.sync()
 
@@ -970,6 +971,7 @@ class MainWindow(gui.ui_united.Ui_MainWindow, QMainWindow):
             if os.path.isfile(resource_path(f"cache/temp_files_{self.current_repo['id']}.zip")):
                 with open(resource_path(f"cache/temp_files_{self.current_repo['id']}.zip"),"rb") as f:
                     content = f.read()
+                isCached = True
             pass
 
         if icons_zip != None:
@@ -983,6 +985,7 @@ class MainWindow(gui.ui_united.Ui_MainWindow, QMainWindow):
             else:
                 with open(resource_path(f"cache/temp_files_{self.current_repo['id']}.zip"),"rb") as f:
                     content = f.read()
+                isCached = True
 
             lock.release()
             end_time = time.time()
@@ -1017,62 +1020,77 @@ class MainWindow(gui.ui_united.Ui_MainWindow, QMainWindow):
                     continue
 
                 apps_category_icons[package["internal_name"]] = category_icon
+            
+            lock.acquire()
+            if isCached:
+                zipMGR = zipfile.ZipFile(resource_path(f"cache/list_app_widget_icons_{self.current_repo['id']}.zip"), mode='r', compression=zipfile.ZIP_DEFLATED)
+            else:
+                zipMGR = zipfile.ZipFile(resource_path(f"cache/list_app_widget_icons_{self.current_repo['id']}.zip"), mode='w', compression=zipfile.ZIP_DEFLATED)
 
             for name in zip_file.namelist():
                 app_name = name.replace(".png", "")
-
-                # Prepare with Pillow
-                pillow_icon = Image.open(io.BytesIO(zip_file.read(name))).convert("RGBA")
-
-                # for faster unmodified icon loading, saving original image to icons images list
-                # remove icc profile
-                if pillow_icon.info.get('icc_profile'):
-                    pillow_icon.info['icc_profile'] = ''
-
-                # convert pillow image to bytes
-                icon_bytes = io.BytesIO()
-                pillow_icon.save(icon_bytes, format='PNG')
-
-                # add to icons images list
-                pixmap = QPixmap()
-                pixmap.loadFromData(icon_bytes.getvalue())
                 try:
-                    self.icons_images[app_name] = pixmap
-                except TypeError:
-                    break
-
-                # per platform sizing
-                padding = 33
-                category_icon_size = 24
-                if app.style().name() == "fusion":
-                    padding = int(padding * 1.5) - 4
-                    category_icon_size = int(category_icon_size * 1.5)
-
-                # Add transparent pixels on the left
-                prepared_icon = Image.new('RGBA', (pillow_icon.width + padding, pillow_icon.height))
-                prepared_icon.alpha_composite(pillow_icon, (padding, 0))
-
-                # add category icon
-                try:
-                    category_icon = apps_category_icons[app_name].resize((category_icon_size, category_icon_size))
+                    apps_category_icons[app_name]
                 except KeyError:
-                    # in a scenario where an app has icon but does not exist on repo
-                    continue
+                        # in a scenario where an app has icon but does not exist on repo
+                        continue
+                if not isCached:
 
-                # place category icon in the middle
-                x, category_icon_height = category_icon.size
-                x, prepared_icon_height = prepared_icon.size
-                y = int((prepared_icon_height / 2) - (category_icon_height / 2))
-                prepared_icon.alpha_composite(category_icon, (0, y))
+                    # Prepare with Pillow
+                    pillow_icon = Image.open(io.BytesIO(zip_file.read(name))).convert("RGBA")
 
-                # convert pillow image to bytes
-                icon_bytes = io.BytesIO()
-                prepared_icon.save(icon_bytes, format='PNG')
+                    # for faster unmodified icon loading, saving original image to icons images list
+                    # remove icc profile
+                    if pillow_icon.info.get('icc_profile'):
+                        pillow_icon.info['icc_profile'] = ''
+
+                    # convert pillow image to bytes
+                    icon_bytes = io.BytesIO()
+                    pillow_icon.save(icon_bytes, format='PNG')
+
+                    # add to icons images list
+                    pixmap = QPixmap()
+                    pixmap.loadFromData(icon_bytes.getvalue())
+                    try:
+                        self.icons_images[app_name] = pixmap
+                    except TypeError:
+                        break
+
+                    # per platform sizing
+                    padding = 33
+                    category_icon_size = 24
+                    if app.style().name() == "fusion":
+                        padding = int(padding * 1.5) - 4
+                        category_icon_size = int(category_icon_size * 1.5)
+
+                    # Add transparent pixels on the left
+                    prepared_icon = Image.new('RGBA', (pillow_icon.width + padding, pillow_icon.height))
+                    prepared_icon.alpha_composite(pillow_icon, (padding, 0))
+
+                    # add category icon
+                    category_icon = apps_category_icons[app_name].resize((category_icon_size, category_icon_size))
+
+                    # place category icon in the middle
+                    x, category_icon_height = category_icon.size
+                    x, prepared_icon_height = prepared_icon.size
+                    y = int((prepared_icon_height / 2) - (category_icon_height / 2))
+                    prepared_icon.alpha_composite(category_icon, (0, y))
+
+                    # convert pillow image to bytes
+                    icon_bytes = io.BytesIO()
+                    prepared_icon.save(icon_bytes, format='PNG')
+
+                    zipMGR.writestr(name,icon_bytes.getvalue())
+                else:
+                    icon_bytes = io.BytesIO()
+                    icon_bytes.write(zipMGR.read(name))
 
                 # create list image
                 pixmap = QPixmap()
                 pixmap.loadFromData(icon_bytes.getvalue())
                 self.list_icons_images[app_name] = pixmap
+            zipMGR.close()
+            lock.release()
 
             if original_host == self.current_repo['host']:
                 QtCore.QMetaObject.invokeMethod(self, 'set_app_icons')
