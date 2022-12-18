@@ -3,7 +3,7 @@ import logging
 from PySide6 import QtCore
 from PySide6.QtCore import QSize, QStorageInfo, QDir
 from PySide6.QtGui import QIcon, QGuiApplication
-from PySide6.QtWidgets import QDialog, QDialogButtonBox, QListWidgetItem
+from PySide6.QtWidgets import QDialog, QDialogButtonBox, QListWidgetItem, QMessageBox
 
 import gui_helpers
 from gui import ui_DownloadLocationDialog
@@ -75,12 +75,15 @@ class DownloadLocationDialog(ui_DownloadLocationDialog.Ui_Dialog, QDialog):
         else:
             # set available space label
             self.label_available_space.setVisible(True)
-            self.label_available_space.setText(
-                f"**Available Space:** {file_size(self.comboBox.currentData()['drive'].bytesFree())}")
-            if gui_helpers.settings.value("download/device") == self.comboBox.currentData()["drive"].device():
-                self.checkBox.setChecked(True)
+            if self.package['extracted'] >= self.comboBox.currentData()['drive'].bytesFree():
+                self.label_available_space.setText(
+                    f"<span style='color:#ff4d4d;'><strong>Available Space:</strong> {file_size(self.comboBox.currentData()['drive'].bytesFree())}</span>")
             else:
-                self.checkBox.setChecked(False)
+                self.label_available_space.setText(
+                    f"<strong>Available Space:</strong> {file_size(self.comboBox.currentData()['drive'].bytesFree())}")
+
+            self.checkBox.setChecked(gui_helpers.settings.value("download/device") == self.comboBox.currentData()["drive"].device())
+
             if self.listWidget.count() > 0:
                 self.listWidget.show()
                 self.label_2.show()
@@ -93,6 +96,10 @@ class DownloadLocationDialog(ui_DownloadLocationDialog.Ui_Dialog, QDialog):
         self.resize(QSize(400, self.minimumSizeHint().height()))
 
     def accept(self):
+        if self.comboBox.currentData() != "browse" and self.package['extracted'] >= self.comboBox.currentData()['drive'].bytesFree():
+            logging.warning('Out of storage')
+            QMessageBox.warning(self, 'Out of storage', 'There is not enough storage on this drive. Please clear some data first.')
+            return
         self.selection = self.comboBox.currentData()
         # save selection if checkbox is checked
         if self.checkBox.isChecked():

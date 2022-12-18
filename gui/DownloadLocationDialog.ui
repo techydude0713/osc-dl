@@ -7,7 +7,7 @@
     <x>0</x>
     <y>0</y>
     <width>400</width>
-    <height>317</height>
+    <height>344</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -114,10 +114,10 @@
         <item>
          <widget class="QLabel" name="label_available_space">
           <property name="text">
-           <string>**Available Space:** 0 MiB</string>
+           <string>&lt;strong&gt;Available Space:&lt;/strong&gt; 0 MiB</string>
           </property>
           <property name="textFormat">
-           <enum>Qt::MarkdownText</enum>
+           <enum>Qt::RichText</enum>
           </property>
          </widget>
         </item>
