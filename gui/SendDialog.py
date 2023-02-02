@@ -6,24 +6,24 @@ from PySide6.QtWidgets import QDialog, QMessageBox
 
 import gui_helpers
 import wiiload
-from gui import ui_WiiLoadDialog
+from gui import ui_SendDialog
 from utils import resource_path
 import serial
 import serial.tools.list_ports
 
 
-class WiiLoadDialog(ui_WiiLoadDialog.Ui_Dialog, QDialog):
+class WiiLoadDialog(ui_SendDialog.Ui_Dialog, QDialog):
     def __init__(self, package, parent=None):
         super().__init__(parent)
         self.setupUi(self)
 
-        self.send_type = {"dol":"App","elf":"App","thm":"Theme"}
+        self.send_type = {"dol": "App", "elf": "App", "thm": "Theme"}
         try:
             self.send_as = self.send_type[package["package_type"]]
-        except: # Just in case, but should never happen.
+        except:  # Just in case, but should never happen.
             self.send_as = "App"
 
-        self.setWindowIcon(QIcon(resource_path("assets/gui/icons/downloadlocationdialog.png")))
+        self.setWindowIcon(QIcon(resource_path("assets/gui/icons/send.png")))
         self.USBDes.setText('Select the serial port for the USB Gecko adapter.<br>'
                             f'The selected {self.send_as.lower()} will be sent through the USBGecko to your Wii.<br><br>'
                             f'<b>{self.send_as} to send: {package["display_name"]}</b><br><br>'
@@ -55,8 +55,6 @@ class WiiLoadDialog(ui_WiiLoadDialog.Ui_Dialog, QDialog):
         if self.PortBox.count() == 0:
             self.PortBox.setPlaceholderText("No USB Gecko devices connected.")
             self.PortBox.setEnabled(False)
-            
-            
 
         self.IPBox.insert(gui_helpers.settings.value("sendtowii/address"))
         if gui_helpers.settings.value("sendtowii/previousTab") is None:
