@@ -401,8 +401,7 @@ class MainWindow(gui.ui_united.Ui_MainWindow, QMainWindow):
                             QMessageBox.critical(self, "Permission Error",
                                                  "Could not create the apps directory on the selected device.")
                             return
-                    save_location = dialog.selection["drive"].rootPath() + "/apps/" + self.current_app[
-                        "internal_name"] + ".zip"
+                    save_location = f"{self.current_app['internal_name']}.zip"
                     extract_root = True
             else:
                 save_location = ''
@@ -442,9 +441,8 @@ class MainWindow(gui.ui_united.Ui_MainWindow, QMainWindow):
                 if extract_root:
                     self.status_message("Extracting..")
                     with zipfile.ZipFile(save_location, 'r') as zip_file:
-                        root_path = save_location.split("/")[0]
                         # unzip to root_path
-                        zip_file.extractall(root_path)
+                        zip_file.extractall(dialog.selection["drive"].rootPath())
                     os.remove(save_location)
 
             self.ui.progressBar.setValue(total_size)

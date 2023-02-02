@@ -3,7 +3,7 @@
 ################################################################################
 ## Form generated from reading UI file 'DownloadLocationDialog.ui'
 ##
-## Created by: Qt User Interface Compiler version 6.4.0
+## Created by: Qt User Interface Compiler version 6.4.1
 ##
 ## WARNING! All changes made in this file will be lost when recompiling UI file!
 ################################################################################
@@ -24,7 +24,7 @@ class Ui_Dialog(object):
     def setupUi(self, Dialog):
         if not Dialog.objectName():
             Dialog.setObjectName(u"Dialog")
-        Dialog.resize(400, 317)
+        Dialog.resize(400, 344)
         self.verticalLayout = QVBoxLayout(Dialog)
         self.verticalLayout.setObjectName(u"verticalLayout")
         self.verticalLayout_2 = QVBoxLayout()
@@ -80,7 +80,7 @@ class Ui_Dialog(object):
 
         self.label_available_space = QLabel(self.frame)
         self.label_available_space.setObjectName(u"label_available_space")
-        self.label_available_space.setTextFormat(Qt.MarkdownText)
+        self.label_available_space.setTextFormat(Qt.RichText)
 
         self.horizontalLayout.addWidget(self.label_available_space)
 
@@ -113,6 +113,6 @@ class Ui_Dialog(object):
         self.checkBox.setText(QCoreApplication.translate("Dialog", u"Remember my selection for next time", None))
         self.label_2.setText(QCoreApplication.translate("Dialog", u"The following folders will be created or updated on the selected device:", None))
         self.label_required_space.setText(QCoreApplication.translate("Dialog", u"**Required Space:** 0 MiB", None))
-        self.label_available_space.setText(QCoreApplication.translate("Dialog", u"**Available Space:** 0 MiB", None))
+        self.label_available_space.setText(QCoreApplication.translate("Dialog", u"<strong>Available Space:</strong> 0 MiB", None))
     # retranslateUi
 
