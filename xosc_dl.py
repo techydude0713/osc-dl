@@ -334,7 +334,7 @@ class MainWindow(gui.ui_united.Ui_MainWindow, QMainWindow):
             if peripherals["sdhc"] is True:
                 item = QListWidgetItem()
                 item.setText(f"SDHC Card")
-                item.setIcon(QIcon(resource_path(f"assets/gui/icons/controllers/{darkdetect.theme()}/SDHC.png")))
+                item.setIcon(QIcon(resource_path(f"assets/gui/icons/controllers/{darkdetect.theme()}/SDHCCard.png")))
                 item.setToolTip("This app is confirmed to support SDHC cards.")
                 self.ui.SupportedControllersListWidget.addItem(item)
 
@@ -1079,8 +1079,10 @@ class MainWindow(gui.ui_united.Ui_MainWindow, QMainWindow):
         if changeEvent.type() == QtCore.QEvent.Type.ThemeChange:
             self.ui.actionDeveloper_Profile.setIcon(QIcon(resource_path(f"assets/gui/icons/profile/{darkdetect.theme()}/profile.png")))
             for x in range(self.ui.SupportedControllersListWidget.count()):
+                controller = self.ui.SupportedControllersListWidget.item(x).text().replace(' ','')
+                controller = controller.replace("WiiRemotes","WiiRemote")
                 self.ui.SupportedControllersListWidget.item(x).setIcon(
-                    QIcon(resource_path(f"assets/gui/icons/controllers/{darkdetect.theme()}/{self.ui.SupportedControllersListWidget.item(x).text().replace(' ','')}.png"))
+                    QIcon(resource_path(f"assets/gui/icons/controllers/{darkdetect.theme()}/{controller}.png"))
                 )
         changeEvent.accept()
 
