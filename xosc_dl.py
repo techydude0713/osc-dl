@@ -720,8 +720,26 @@ class MainWindow(gui.ui_united.Ui_MainWindow, QMainWindow):
     # Actions
     # Enable log
     def turn_log_on(self):
-        logging.basicConfig(filename='oscdl-gui.log', level=logging.DEBUG,
-                            format="%(asctime)s | %(levelname)s:%(name)s:%(message)s")
+        dir_path=""
+        # If the app is frozen, the log should go in the app folder.
+        # Otherwise, it can stay in the directory.
+        if updater.is_frozen(): 
+            if os.name == 'nt':
+                dir_path = '%s\\OSCDL\\' % os.environ['APPDATA']
+                if not os.path.exists(dir_path):
+                    os.makedirs(dir_path)
+                
+            elif sys.platform.startswith('darwin'):
+                dir_path = '%s/Library/Logs/' % os.environ['HOME']
+            else:
+                    dir_path = '%s/' % os.environ['HOME']
+        
+        save_location = f'{dir_path}oscdl-gui.log'
+
+
+
+        logging.basicConfig(filename=save_location, level=logging.DEBUG,
+                            format="%(asctime)s | %(levelname)s:%(name)s:%(message)s", force=True)
         logging.info('Enabled log file. Hello!')
         logging.info("OSCDL v" + DISPLAY_VERSION)
         logging.info(updater.get_type())
@@ -732,7 +750,22 @@ class MainWindow(gui.ui_united.Ui_MainWindow, QMainWindow):
 
     # Clear log file
     def clear_log(self):
-        open("oscdl-gui.log", 'w').close()
+        dir_path=""
+        # If the app is frozen, the log should go in the app folder.
+        # Otherwise, it can stay in the directory.
+        if updater.is_frozen(): 
+            if os.name == 'nt':
+                dir_path = '%s\\OSCDL\\' % os.environ['APPDATA']
+                if not os.path.exists(dir_path):
+                    os.makedirs(dir_path)
+                
+            elif sys.platform.startswith('darwin'):
+                dir_path = '%s/Library/Logs/' % os.environ['HOME']
+            else:
+                    dir_path = '%s/' % os.environ['HOME']
+        
+        save_location = f'{dir_path}oscdl-gui.log'
+        open(save_location, 'w').close()
         self.status_message('Cleared log file.')
 
     # Sort apps in app list in alphabetical, ascending order.
@@ -1075,6 +1108,9 @@ class MainWindow(gui.ui_united.Ui_MainWindow, QMainWindow):
 
 if __name__ == "__main__":
     global app
+
+    if updater.is_frozen():
+        logging.info("This is a PyInstaller app.")
 
     if not utils.is_test("qtdark"):
         app = QApplication()
