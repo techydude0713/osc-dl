@@ -1,5 +1,6 @@
 import io
 import platform
+import tempfile
 import threading
 import time
 import zipfile
@@ -413,6 +414,7 @@ class MainWindow(gui.ui_united.Ui_MainWindow, QMainWindow):
                 save_location = f"{self.current_app['internal_name']}.zip"
         self.ui.progressBar.setValue(0)
         if save_location:
+            app_data_file = tempfile.TemporaryFile()
             # stream file, so we can iterate
             response = requests.get(self.current_app["zip_url"], stream=True)
             total_size = int(response.headers.get('content-length', 0))
@@ -424,32 +426,39 @@ class MainWindow(gui.ui_united.Ui_MainWindow, QMainWindow):
                 self.safe_mode(True)
                 self.status_icon("download")
 
-                with open(save_location, "wb") as app_data_file:
-                    for data in response.iter_content(block_size):
-                        self.ui.progressBar.setValue(self.ui.progressBar.value() + 1024)
-                        self.status_message(
-                            f"Downloading {self.current_app['display_name']} from Open Shop Channel.. ({utils.file_size(self.ui.progressBar.value())}/{utils.file_size(total_size)})")
-                        try:
-                            app.processEvents()
-                        except NameError:
-                            pass
-                        app_data_file.write(data)
-
+                #with open(save_location, "wb") as app_data_file:
+                for data in response.iter_content(block_size):
+                    self.ui.progressBar.setValue(self.ui.progressBar.value() + 1024)
+                    self.status_message(
+                        f"Downloading {self.current_app['display_name']} from Open Shop Channel.. ({utils.file_size(self.ui.progressBar.value())}/{utils.file_size(total_size)})")
+                    try:
+                        app.processEvents()
+                    except NameError:
+                        pass
+                    app_data_file.write(data)
+                
+                app_data_file.seek(0,0)
                 if extract_root:
                     self.status_message("Extracting..")
-                    with zipfile.ZipFile(save_location, 'r') as zip_file:
+                    with zipfile.ZipFile(app_data_file, 'r') as zip_file:
                         root_path = save_location.split("/")[0]
                         # unzip to root_path
                         zip_file.extractall(root_path)
-                    os.remove(save_location)
+                elif (object_name != "WiiLoadButton"):
+                    with open(save_location, "wb") as file:
+                        file.write(app_data_file.read())
 
             self.ui.progressBar.setValue(total_size)
-            if object_name != "WiiLoadButton":
-                self.safe_mode(False)
             self.status_message(f"Download of \"{self.current_app['display_name']}\" has completed successfully")
             self.status_icon("online")
             gui_helpers.IN_DOWNLOAD_DIALOG = False
-            return save_location
+            if object_name != "WiiLoadButton":
+                self.safe_mode(False)
+                app_data_file.close()
+                return
+            app_data_file.seek(0,0)
+            return io.BytesIO(app_data_file.read())
+            
         else:
             self.ui.progressBar.setMaximum(100)
             self.ui.progressBar.setValue(0)
@@ -488,13 +497,7 @@ class MainWindow(gui.ui_united.Ui_MainWindow, QMainWindow):
         self.ui.progressBar.setValue(25)
 
         # get app
-        path_to_app = self.download_app()
-        self.ui.progressBar.setMaximum(100)
-
-        with open(path_to_app, 'rb') as f:
-            content = f.read()
-
-        zipped_app = io.BytesIO(content)
+        zipped_app = self.download_app()
         zip_buf = io.BytesIO()
 
         # Our zip file should only contain one directory with the app data in it,
@@ -535,8 +538,6 @@ class MainWindow(gui.ui_united.Ui_MainWindow, QMainWindow):
             self.status_message('Error: Could not connect to the Homebrew Channel. :(')
             self.status_icon('online')
 
-            # delete application zip file
-            os.remove(path_to_app)
             gui_helpers.CURRENTLY_SENDING = False
             self.safe_mode(False)
             return
@@ -568,15 +569,13 @@ class MainWindow(gui.ui_united.Ui_MainWindow, QMainWindow):
                     self.ui.progressBar.setValue(0)
                     self.status_message('Error: Could not connect to the Homebrew Channel. :(')
 
-                    # delete application zip file
-                    os.remove(path_to_app)
                     gui_helpers.CURRENTLY_SENDING = False
                     self.safe_mode(False)
                     return
         # USBGecko
         else:
             # conn.send is blocking, used thread to avoid.
-            t = threading.Thread(target=self.send_gecko, daemon=True, args=[c_data, conn, path_to_app])
+            t = threading.Thread(target=self.send_gecko, daemon=True, args=[c_data, conn])
             t.start()
             self.ui.progressBar.setMaximum(0)
             while t.is_alive():
@@ -595,8 +594,6 @@ class MainWindow(gui.ui_united.Ui_MainWindow, QMainWindow):
         file_name = f'{self.current_app["internal_name"]}.zip'
         conn.send(bytes(file_name, 'utf-8') + b'\x00')
 
-        # delete application zip file
-        os.remove(path_to_app)
 
         if dialog.modeSelect == 1:
             conn.flush()
@@ -609,7 +606,7 @@ class MainWindow(gui.ui_united.Ui_MainWindow, QMainWindow):
         gui_helpers.CURRENTLY_SENDING = False
         self.safe_mode(False)
 
-    def send_gecko(self, c_data, conn, path_to_app):
+    def send_gecko(self, c_data, conn):
         try:
             conn.send(c_data)
         except Exception as e:
@@ -620,8 +617,6 @@ class MainWindow(gui.ui_united.Ui_MainWindow, QMainWindow):
             self.ui.progressBar.setValue(0)
             self.status_message('Error: Could not connect to the Homebrew Channel. :(')
 
-            # delete application zip file
-            os.remove(path_to_app)
             conn.close()
             gui_helpers.DATASENT = False
             return
