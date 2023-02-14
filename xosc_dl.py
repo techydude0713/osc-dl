@@ -1,8 +1,10 @@
 import io
 import platform
+import re
 import tempfile
 import threading
 import time
+from typing import Sequence
 import zipfile
 from datetime import datetime
 from os import listdir
@@ -21,8 +23,8 @@ import func_timeout
 import requests
 from PIL import Image
 from PySide6 import QtGui, QtCore
-from PySide6.QtCore import Qt, QObject, QSize
-from PySide6.QtGui import QIcon, QColor, QPixmap, QMovie, QDesktopServices
+from PySide6.QtCore import Qt, QObject, QSize, QEvent
+from PySide6.QtGui import QIcon, QColor, QPixmap, QMovie, QDesktopServices, QFileOpenEvent
 from PySide6.QtWidgets import QApplication, QMainWindow, QInputDialog, QLineEdit, QMessageBox, QSplashScreen, \
     QListWidgetItem, QFileDialog
 
@@ -208,6 +210,9 @@ class MainWindow(gui.ui_united.Ui_MainWindow, QMainWindow):
         self.ui.listAppsWidget.currentItemChanged.connect(self.selection_changed)
         self.ui.tabMetadata.currentChanged.connect(self.tab_changed)
         self.ui.actionDeveloper_Profile.triggered.connect(self.developer_profile)
+        gui_helpers.INCOMING_REQUEST.data.connect(self.DLRequest,Qt.ConnectionType.QueuedConnection)
+        gui_helpers.INCOMING_REQUEST.download.connect(self.download_app,Qt.ConnectionType.QueuedConnection)
+        gui_helpers.INCOMING_REQUEST.send.connect(self.wiiload_button,Qt.ConnectionType.QueuedConnection)
 
         # Actions
         # -- About
@@ -397,6 +402,7 @@ class MainWindow(gui.ui_united.Ui_MainWindow, QMainWindow):
                         except PermissionError:
                             QMessageBox.critical(self, "Permission Error",
                                                  "Could not create the apps directory on the selected device.")
+                            gui_helpers.IN_DOWNLOAD_DIALOG = False
                             return
                     save_location = dialog.selection["drive"].rootPath() + "/apps/" + self.current_app[
                         "internal_name"] + ".zip"
@@ -484,11 +490,14 @@ class MainWindow(gui.ui_united.Ui_MainWindow, QMainWindow):
         self.ui.listAppsWidget.setDisabled(state)
 
     def wiiload_button(self):
+        gui_helpers.IN_WIILOAD_DIALOG = True
         if not utils.app_has_extra_directories(self.current_app) and QMessageBox.question(self, "Send to Wii", "This app contains extra files and directories that may need configuration. Send anyway?") == QMessageBox.StandardButton.No:
+            gui_helpers.IN_WIILOAD_DIALOG = False
             return
         
         dialog = WiiLoadDialog(self.current_app, parent=self)
         status = dialog.exec()
+        gui_helpers.IN_WIILOAD_DIALOG = False
         if not status:
             return
         gui_helpers.CURRENTLY_SENDING = True
@@ -639,6 +648,7 @@ class MainWindow(gui.ui_united.Ui_MainWindow, QMainWindow):
 
     def repopulate(self):
         # Make sure everything is hidden / shown
+        gui_helpers.WAIT_FOR_REPOPULATION = True
         self.ui.ReturnToMainBtn.setHidden(True)
         self.ui.CategoriesComboBox.setHidden(False)
         self.ui.ReposComboBox.setHidden(False)
@@ -710,6 +720,7 @@ class MainWindow(gui.ui_united.Ui_MainWindow, QMainWindow):
                                  f'{e}')
             sys.exit(1)
 
+        gui_helpers.WAIT_FOR_REPOPULATION = False
         # load app icons
         if not gui_helpers.CURRENTLY_SENDING and not gui_helpers.IN_DOWNLOAD_DIALOG:
             self.status_message("Loading app icons from server..")
@@ -975,6 +986,8 @@ class MainWindow(gui.ui_united.Ui_MainWindow, QMainWindow):
 
     # load all icons from zip
     def download_app_icons(self):
+        if self.test_mode == True:
+            return
         gui_helpers.CURRENTLY_LOADING_ICONS = True
         # Debug info
         original_host = self.current_repo['host']
@@ -1095,7 +1108,7 @@ class MainWindow(gui.ui_united.Ui_MainWindow, QMainWindow):
         self.reset_status()
 
     def closeEvent(self, closeEvent):
-        if self.ongoingOperations():
+        if self.ongoingOperations() and self.test_mode == False:
             # QMessageBox.warning is modal, this is not. 
             self.message.show()
             closeEvent.ignore()
@@ -1103,7 +1116,117 @@ class MainWindow(gui.ui_united.Ui_MainWindow, QMainWindow):
             closeEvent.accept()
 
     def ongoingOperations(self):
-        return gui_helpers.CURRENTLY_SENDING or gui_helpers.IN_DOWNLOAD_DIALOG or gui_helpers.CURRENTLY_LOADING_ICONS
+        return gui_helpers.CURRENTLY_SENDING or gui_helpers.IN_DOWNLOAD_DIALOG or gui_helpers.IN_WIILOAD_DIALOG or gui_helpers.CURRENTLY_LOADING_ICONS
+    
+    @QtCore.Slot(str)
+    def DLRequest(self, data):
+        # The user is already doing something, so toss the request.
+        # (Downloading icons is okay.)
+        if gui_helpers.CURRENTLY_SENDING or gui_helpers.IN_DOWNLOAD_DIALOG or gui_helpers.IN_WIILOAD_DIALOG or gui_helpers.URL_LOCK:
+            logging.debug("[URL Scheme ERROR]: We can't continue due to ongoing downloads.")
+            return
+        logging.debug("[URL Scheme INFO]: Now ready to accept URL.")
+        
+        # Since the user asked for something via URL, enable safe mode momentarily.
+        gui_helpers.URL_LOCK = True
+        self.safe_mode(True)
+        
+        # Waiting until the MainWindow is ready.
+        if self.ongoingOperations():
+            logging.debug("[URL Scheme INFO]: Waiting for no current operations.")
+            while self.ongoingOperations():
+                app.processEvents()
+
+        repo, name, method = data.split("/")
+        logging.debug(f"[URL Scheme Info]: Recieved 'osc-dl://{repo}/{name}/{method}'")
+        
+        # "osc-dl://repo/name/method"
+        # The regex detects if there is any whitespace or non alphanumerical characters.
+        if (method != "download" and method != "send") or re.match(r'[^\w]',name) or re.match(r'[^\w]',repo):
+            QMessageBox.warning(self,"URL not valid", "The URL entered is incorrect, please check again.")
+            logging.debug("[URL Scheme ERROR]: Invalid command or bad characters detected.")
+            gui_helpers.URL_LOCK = False
+            self.safe_mode(False)
+            return
+        
+        # First, check if we are in the correct repo.
+        if self.current_repo["id"] != repo:
+            index = -1
+            for x in range(self.ui.ReposComboBox.count()):
+                if self.ui.ReposComboBox.itemData(x, Qt.UserRole)[3] == repo:
+                    index = x
+                    break
+            if index == -1:
+                QMessageBox.warning(self,"URL not valid", "The URL entered is incorrect, please check again.")
+                logging.debug("[URL Scheme ERROR]: No such repo.")
+                gui_helpers.URL_LOCK = False
+                self.safe_mode(False)
+                return
+            gui_helpers.WAIT_FOR_REPOPULATION = True
+            self.ui.ReposComboBox.setCurrentIndex(index)
+            # We need to make sure everything is downloaded before continuing
+            while gui_helpers.WAIT_FOR_REPOPULATION or self.ongoingOperations():
+                app.processEvents()
+        
+        # List all apps.
+        self.ui.CategoriesComboBox.setCurrentIndex(0)
+
+        # Looking for application
+        res = next((x for x in self.apps.get_apps() if x["internal_name"] == name),None)
+        if not res:
+            QMessageBox.warning(self,"URL not valid", "The URL entered is incorrect, please check again.")
+            logging.debug("[URL Scheme ERROR]: No such application.")
+            gui_helpers.URL_LOCK = False
+            self.safe_mode(False)
+            return
+        
+        # Find a match by the display name, 
+        # get the index 
+        # set the row
+        self.ui.listAppsWidget.setCurrentRow(self.ui.listAppsWidget.indexFromItem(self.ui.listAppsWidget.findItems(res["display_name"], Qt.MatchFlag.MatchContains)[0]).row())
+
+        # Activate the appropriate function
+        if method == "download":
+            gui_helpers.INCOMING_REQUEST.download.emit(True)
+        else:
+            gui_helpers.INCOMING_REQUEST.send.emit(True)
+        
+        gui_helpers.URL_LOCK = False
+        self.safe_mode(False)
+        logging.debug("[URL Scheme INFO]: Process completed.")
+        return
+
+class OSCDL(QApplication):
+    # Allows arguments to be added
+    def __init__(self, arg__1: Sequence[str]=[]):
+        super(OSCDL,self).__init__(arg__1)
+
+    def event(self, event):
+        # FileOpenEvents are based of files or URLs, we need URLs here.
+        if event.type() == QEvent.Type.FileOpen: 
+            fileEvent = QFileOpenEvent(event)
+            url = fileEvent.url().toString()
+            #if ("osc-dl://" not in url):
+                #return super().event(event)
+            search = re.search(r"osc-(?:dl|dlpy)\W{1,3}",url)
+            if not search:
+                return super().event(event)
+            span = search.span()[1]
+            logging.info(url)
+            # Here's how a query should look:
+            # "osc-dl[py]://repo/internal_name/download_or_send"
+            # Just doing some basic checking here, which is passed on to MainWindow.
+            if (len(url[span:].split("/")) == 3):
+                logging.debug("[URL Scheme INFO]: We recieved data...")
+                if not gui_helpers.WINDOW_IS_READY:
+                    # If you're here, you launched the app by acessing the URL.
+                    # Because the window is not ready, we need to hold the value for a while.
+                    gui_helpers.INCOMING_REQUEST_BUCKET = url[span:]
+                else:
+                    gui_helpers.INCOMING_REQUEST.data.emit(url[span:])
+        return super().event(event)  
+
+        
 
 
 if __name__ == "__main__":
@@ -1112,10 +1235,11 @@ if __name__ == "__main__":
     if updater.is_frozen():
         logging.info("This is a PyInstaller app.")
 
+    # Instead of directly creating a QApplication, we need to make a subset.
     if not utils.is_test("qtdark"):
-        app = QApplication()
+        app = OSCDL(["NSRequiresAquaSystemAppearance","False"])
     else:
-        app = QApplication([sys.argv[0], '-platform', f'windows:darkmode={sys.argv[2]}'])
+        app = OSCDL([sys.argv[0], '-platform', f'windows:darkmode={sys.argv[2]}'])
 
     # set windows style for macOS users
     if platform.system() == "Darwin":
@@ -1131,4 +1255,10 @@ if __name__ == "__main__":
     window = MainWindow()
     window.show()
     splash.hide()
+    # Must be after showing the window and hiding the splash.
+    gui_helpers.WINDOW_IS_READY=True
+    if gui_helpers.INCOMING_REQUEST_BUCKET:
+        logging.debug("[URL Scheme INFO]: Data is from bucket.")
+        gui_helpers.INCOMING_REQUEST.data.emit(gui_helpers.INCOMING_REQUEST_BUCKET)
+    # The bucket will not be used after this point.
     app.exec()

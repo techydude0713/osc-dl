@@ -58,5 +58,14 @@ app = BUNDLE(
     coll,
     name='OSC-DL.app',
     icon='oscicon.ico',
-    bundle_identifier=None,
+    bundle_identifier="com.OSC.OSCDL",
+    info_plist={
+        'CFBundleURLTypes' : [
+            {
+                'CFBundleTypeRole' : 'Viewer',
+                'CFBundleURLName' : 'OSC-DL',
+                'CFBundleURLSchemes' : ['osc-dl'],
+            }
+        ]
+    }
 )
